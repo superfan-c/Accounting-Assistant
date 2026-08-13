@@ -286,9 +286,11 @@ export default function EmailLogin() {
           </div>
         )}
 
-        <Text type="secondary" className="login-hint">
-          💡 {isReset ? t('resetHint') : t('loginHint')}
-        </Text>
+        {isReset && (
+          <Text type="secondary" className="login-hint">
+            💡 {t('resetHint')}
+          </Text>
+        )}
       </Card>
     </div>
   )

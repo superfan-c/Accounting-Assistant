@@ -14,7 +14,6 @@ export type I18nKey =
   | 'confirmPassword'
   | 'loginBtn'
   | 'registerBtn'
-  | 'loginHint'
   | 'forgotPassword'
   | 'sendReset'
   | 'backToLogin'
@@ -86,7 +85,6 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
     confirmPassword: '确认密码',
     loginBtn: '登录',
     registerBtn: '注册',
-    loginHint: '以前用验证码登录的账号，点「忘记密码」给原邮箱设密码即可',
     forgotPassword: '忘记密码？',
     sendReset: '发送重置邮件',
     backToLogin: '返回登录',
@@ -157,7 +155,6 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
     confirmPassword: 'Confirm password',
     loginBtn: 'Sign in',
     registerBtn: 'Sign up',
-    loginHint: 'Used OTP before? Tap “Forgot password” to set a password for the same email',
     forgotPassword: 'Forgot password?',
     sendReset: 'Send reset email',
     backToLogin: 'Back to sign in',
@@ -228,7 +225,6 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
     confirmPassword: 'パスワード確認',
     loginBtn: 'ログイン',
     registerBtn: '登録',
-    loginHint: '以前コードでログインしていた場合は「パスワードを忘れた」で設定できます',
     forgotPassword: 'パスワードを忘れた？',
     sendReset: 'リセットメールを送信',
     backToLogin: 'ログインに戻る',
