@@ -116,7 +116,7 @@ RLS：只能读写自己的数据（`auth.uid() = user_id`）。
 
 以前用验证码注册、还没有密码的账号：登录页点「忘记密码」，给原邮箱设一次密码即可。
 
-登录态用 Supabase refresh token 存在 `localStorage`（体积超过 Cookie 上限，不能改用 Cookie），并自动刷新。
+登录态用 Supabase refresh token 存在 `localStorage`，并自动刷新。
 
 ---
 
@@ -133,7 +133,7 @@ npx web-push generate-vapid-keys
 ```
 
 - 公钥 → `.env` 的 `REACT_APP_VAPID_PUBLIC_KEY`，并同步到 Edge Function Secret `VAPID_PUBLIC_KEY`
-- 私钥 **只** 放到 Function Secret `VAPID_PRIVATE_KEY`，不要写进仓库
+- 私钥 **只** 放到 Function Secret `VAPID_PRIVATE_KEY`
 
 ### 2. 部署 Edge Function
 
@@ -143,34 +143,59 @@ npx web-push generate-vapid-keys
 npx supabase functions deploy send-reminders --project-ref fvevsvsbyzougcjannqh
 ```
 
-Secrets 在 Dashboard 左侧 **Edge Functions → Secrets**（不是右上角齿轮的 Project Settings）：
+Secrets 在 Dashboard 左侧 **Edge Functions → Secrets**：
 
 | Secret | 说明 |
 |--------|------|
 | `VAPID_PUBLIC_KEY` | 与前端公钥相同 |
 | `VAPID_PRIVATE_KEY` | VAPID 私钥 |
-| `VAPID_SUBJECT` | 必须是 URL，例如 `mailto:你的邮箱@qq.com`（不要只填邮箱） |
-| `CRON_SECRET` | 自定一串随机字符，Cron 调用时带上 |
+| `VAPID_SUBJECT` | 必须是 URL，例如 `mailto:你的邮箱@xxx.com` |
+| `CRON_SECRET` | 自定义一串随机字符，Cron 调用时带上 |
 
 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` 由平台自动注入，一般不用手填。
 
-调用地址：
+### 3. Cron 调用配置
+
+函数自己不会到点执行，必须由 Cron **每分钟 HTTP POST 一次**。发送窗口是「到点后约 5 分钟」，每分钟扫一次才不容易漏；没到点会马上返回，对免费额度影响很小。
+
+#### 先启用扩展
+
+否则建任务会报找不到 `cron.job`：
+
+1. Dashboard → **Database → Extensions**
+2. 搜索并启用 **`pg_cron`**、**`pg_net`**
+
+#### 再建定时任务
+
+Dashboard → **Integrations → Cron** → Create a new job，按下面填：
+
+| 字段 | 填什么 |
+|------|--------|
+| Name | `send-reminders`（任意名称） |
+| Schedule | `* * * * *`（每分钟；不是只在 21:00 跑一次） |
+| Type | HTTP Request |
+| Method | **POST** |
+| URL | `https://fvevsvsbyzougcjannqh.supabase.co/functions/v1/send-reminders` |
+| Timeout | **5000～10000 ms**（默认 1000ms 太短，函数跑不完） |
+| HTTP Headers | 见下方，必须带上 `CRON_SECRET` |
+| HTTP Body | `{}` 即可 |
+
+请求头用下面 **任选一种**（`CRON_SECRET` 必须和 Edge Function Secrets 里的值完全一致）。推荐第一种，避免和平台自动加的 `Authorization` 打架：
 
 ```
-POST https://fvevsvsbyzougcjannqh.supabase.co/functions/v1/send-reminders
+Content-Type: application/json
+x-cron-secret: <CRON_SECRET>
 ```
 
-请求头任选一种鉴权：
+或：
 
-- `x-cron-secret: <CRON_SECRET>`
-- `Authorization: Bearer <CRON_SECRET>`
+```
+Content-Type: application/json
+Authorization: Bearer <CRON_SECRET>
+```
 
-超时建议 **5000～10000ms**（不要设成 1000ms，函数来不及跑完）。
+注意：`Authorization` 后面跟的是 **`CRON_SECRET`**，不是 anon / publishable key。函数 `verify_jwt = false`，用这串密钥鉴权。
 
-### 3. 定时触发
+保存后可在 Cron 任务日志或 Edge Function Logs 里看到每分钟的调用。返回 `{"ok":true,"sent":0,...}` 表示扫过了但还没到点或当天已记过账，属于正常。
 
-Dashboard → **Integrations → Cron**，每分钟执行一次（`* * * * *`），HTTP POST 上述地址。
-
-需要先启用扩展 **`pg_cron`** 和 **`pg_net`**，否则建任务会失败。
-
-前端入口：我的 → **记账提醒** → 弹窗改开关 / 时间 / 模板 → **确定** 保存（点遮罩不会关闭）。
+前端入口：我的 → **记账提醒** → 弹窗改开关 / 时间 / 模板 → **确定** 保存。
