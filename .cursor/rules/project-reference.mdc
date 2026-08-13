@@ -1,0 +1,183 @@
+---
+description: 记账助手项目参考手册——架构、Supabase、认证、功能与常见坑
+alwaysApply: true
+---
+
+# 记账助手（Ledger Assistant）项目参考
+
+产品说明与部署步骤见仓库根目录 `README.md`。本文件给后续改代码用，保持与现状一致。
+
+## 1. 产品定位
+
+- 应用名：**记账助手**（中/英/日文案见 `src/i18n/translations.ts`）
+- 移动端风格记账 App：记账 / 明细 / 统计 / 我的
+- Logo：账本 + 勾选金币（`src/components/AppLogo.tsx`，`public/favicon.svg`）
+
+## 2. 技术栈
+
+| 层 | 技术 | 本仓库版本 |
+|----|------|------------|
+| 前端 | React + TypeScript + Vite | React 19、TypeScript 6、Vite 8 |
+| UI | Ant Design + Ant Design Mobile（底部 TabBar） | antd 6、antd-mobile 5 |
+| 路由 | React Router（`BrowserRouter`） | react-router-dom 7 |
+| 图表 | Recharts | 3 |
+| 日期 | dayjs | 1.11 |
+| CSV | PapaParse | 5 |
+| 后端/数据 | **Supabase**（Auth + PostgreSQL + RLS） | @supabase/supabase-js 2 |
+| 记账提醒 | Web Push + SW + Edge Function `send-reminders` + Cron | `public/sw.js` |
+| 本地偏好 | `localStorage`（背景、字体、语言、头像） | **不**再用 localforage |
+
+环境变量（Vite 已配置 `envPrefix: ['VITE_', 'REACT_APP_']`）：
+
+```
+REACT_APP_SUPABASE_URL=https://<project-ref>.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=<anon 或 sb_publishable_...>
+REACT_APP_VAPID_PUBLIC_KEY=<web-push 公钥>
+```
+
+客户端：`src/lib/supabaseClient.ts`（从 `import.meta.env` 读取）。密钥只写在 `.env`，勿提交仓库。
+
+## 3. 环境要求
+
+- Node.js **20.19+** 或 **22.12+**（Vite 8）；包管理器用 npm
+- 浏览器：近两年的 Chrome / Edge / Firefox / Safari
+- 生产环境推送必须 **HTTPS**（本地 `http://localhost` 可以）
+- 提醒需要 Notification + Push API + Service Worker
+- 部署函数可用 `npx supabase`，不必全局安装 CLI
+
+国内 Chrome 常因连不上 Google FCM 导致 `Registration failed - push service not available`，可改用 Firefox 或给浏览器开可访问外网的代理。iPhone 需「添加到主屏幕」后在 PWA 里授权。
+
+## 4. 目录要点
+
+```
+src/
+  lib/supabaseClient.ts     # Supabase 客户端（登录态写入 localStorage，自动刷新 token）
+  lib/push.ts                # Web Push 订阅
+  storage.ts                 # 云端 CRUD（必须已登录）
+  reminderStorage.ts         # 提醒设置 + 推送订阅（云端）
+  settings.ts                # 本地 AppSettings + 字体/语言应用
+  context/AuthContext.tsx    # 登录态
+  context/SettingsContext.tsx# 设置 + t()
+  i18n/translations.ts       # zh / en / ja
+  pages/EmailLogin.tsx       # 邮箱 + 密码（登录 / 注册 / 忘记密码）
+  pages/AddRecord.tsx        # 记账
+  pages/RecordList.tsx       # 明细（按月/年、编辑删除、导出）
+  pages/Statistics.tsx       # 收支占比饼图 + 近30天双折线
+  pages/Profile.tsx          # 个人中心、设置入口、记账提醒导航
+  pages/CategoryManage.tsx   # 分类管理
+  components/RecordForm.tsx  # 记账/编辑表单
+  components/SettingsModal.tsx
+  components/ReminderModal.tsx  # 提醒弹窗：开关/时间/模板，确定才保存
+  layouts/MainLayout.tsx     # Tab 常驻保活 + 背景
+supabase/
+  schema.sql                 # 表 + RLS + 默认分类触发器 + 提醒表
+  reminder.sql               # 已有库补提醒表
+  functions/send-reminders/  # 到点检查并发送 Web Push
+  config.toml                # send-reminders 的 verify_jwt = false
+  email-otp-template.html    # 旧 OTP 模板（密码登录后不再需要）
+public/
+  sw.js                      # 仅处理推送/点击，不缓存页面
+  manifest.webmanifest
+```
+
+## 5. 当前 Supabase 项目
+
+| 项 | 值 |
+|----|-----|
+| Project URL | `https://fvevsvsbyzougcjannqh.supabase.co` |
+| Dashboard | https://supabase.com/dashboard/project/fvevsvsbyzougcjannqh |
+| 函数地址 | `POST https://fvevsvsbyzougcjannqh.supabase.co/functions/v1/send-reminders` |
+
+Secrets 在左侧 **Edge Functions → Secrets**（不是右上角齿轮的 Project Settings）。
+
+## 6. 数据模型（Supabase）
+
+- **categories**：`id, user_id, name, icon, type('income'|'expense')`，`(user_id, name, type)` 唯一
+- **records**：`id, user_id, amount(分), type, category_id, date, note, created_at`
+- **reminder_settings**：`user_id, enabled, remind_time（北京时间）, template_key, message_body, last_sent_on`
+- **reminder_subscriptions**：Web Push 订阅（endpoint / p256dh / auth）
+- RLS：仅 `auth.uid() = user_id` 可读写
+- 新用户注册后由触发器 `handle_new_user_categories` 写入默认分类（前端不再 init 默认分类）
+
+金额约定：**库内单位为分（integer）**，界面用元展示（`src/utils/format.ts`）。
+
+`storage.ts` 主要 API：
+
+- `getCategories` / `saveCategory` / `updateCategory` / `deleteCategory`
+- `getRecords({ month?, year?, keyword?, categoryId? })`
+- `saveRecord` / `updateRecord(id, changes)` / `deleteRecord`
+- `getRecordStats` / `getRecordSummary` / `getStreakDays`
+- 未登录调用直接抛错「请先登录」
+
+## 7. 认证（邮箱 + 密码）
+
+- 登录：`signInWithPassword({ email, password })`
+- 注册：`signUp({ email, password })`
+- 忘记密码：`resetPasswordForEmail` → 用户点邮件链接回到 `/login?mode=reset` → `updateUser({ password })`
+- 路由守卫：未登录一律进 `/login`；已登录展示 Tab；重置密码过程中停留在登录页
+- 登录态：Supabase **refresh token 存在 localStorage**（体积超过 Cookie 上限，不能改用 Cookie），并 `autoRefreshToken`
+- 建议在 Dashboard → Authentication → Settings 把 Refresh token 有效期调到 30～90 天
+
+### Dashboard 必改（否则注册仍会发确认邮件、占用额度）
+
+1. **Authentication → Providers → Email**：开启 Email
+2. **Confirm email：关闭**（关闭后注册立即登录，日常不再发邮件）
+3. **URL Configuration → Redirect URLs** 加上：
+   - `http://localhost:5173/login**`
+   - `https://你的域名/login**`
+4. 以前用验证码注册的账号没有密码：登录页点「忘记密码」，给原邮箱设一次密码即可
+
+## 8. 功能清单（已实现）
+
+- 记账：支出/收入 Segmented（带图标）、分类、金额、日期、备注
+- 明细：按月/年、搜索、卡片边框、左滑/弹窗编辑删除、CSV 导出
+- 统计：月收支结余、支出/收入分类饼图、近 30 天收入+支出双折线
+- 分类管理：增删改；有记录的分类不可删
+- 我的：脱敏邮箱、头像上传、统计卡片、记账提醒导航行、导出、退出
+- 设置（我的 → 设置）：背景预设/上传图、字体、语言 zh/en/ja、头像
+- 记账提醒（我的 → 导航打开 `ReminderModal`）：开关 + 北京时间每天固定时刻 + 文案模板；**确定才保存，取消/X 不保存，点遮罩不关闭**（`maskClosable={false}`）。不要再加「立刻试一条通知」测试按钮。弹窗里不要写「几分钟后」或「点通知会打开网站」那两段说明。
+
+## 9. 记账提醒（Web Push）
+
+规则：北京时间钟点（例如 `21:00`），到点后约 5 分钟窗口内检查；**当天还没记账** 才推送。点通知打开网站：有 token 进「记一笔」，没有则进登录页。
+
+Edge Function Secrets：`VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`CRON_SECRET`。
+
+- `VAPID_SUBJECT` 必须是 URL：`mailto:邮箱@qq.com`（不要只填邮箱；函数也会给纯邮箱补 `mailto:`）
+- Cron 鉴权：`x-cron-secret: <CRON_SECRET>` 或 `Authorization: Bearer <CRON_SECRET>`
+- Cron：`* * * * *`，需先启用 **`pg_cron` + `pg_net`**；超时 **5000～10000ms**
+- 免费计划每分钟调用约 4.3 万次/月，远低于 50 万次额度，一般不必改间隔
+
+限制：电脑关机/没网/拒绝通知权限则收不到。
+
+## 10. UI / 路由约定
+
+- 主 Tab 用 `display:none` 常驻，切换保状态；进 `/categories` 会卸载 MainLayout
+- 背景类名：`bg-default|mint|sunset|ocean|custom`（`src/utils/background.ts`）
+- 弹窗统一右上角 X 关闭（受控 `Modal`，`closable`）
+- 记账提醒弹窗：`width={420}`、`centered`、`maskClosable={false}`，底部确定/取消
+
+## 11. 本地开发
+
+```bash
+npm install
+npm run dev    # 改 .env 后需重启
+npm run build
+```
+
+首次上线检查清单：
+
+1. `.env` 已填 URL + Key + `REACT_APP_VAPID_PUBLIC_KEY`
+2. SQL Editor 已执行 `supabase/schema.sql`（已有库补执行 `supabase/reminder.sql`）
+3. Authentication → Providers → Email 已开启，**Confirm email 已关闭**
+4. Redirect URLs 已包含 `http://localhost:5173/login**`（及线上地址）
+5. 已生成 VAPID 密钥：`npx web-push generate-vapid-keys`
+6. Edge Function `send-reminders` 已部署，Secrets 见第 9 节
+7. Integrations → Cron 每分钟 POST `send-reminders`
+
+## 12. 演进注意
+
+- 原 localforage 方案已废弃
+- Publishable key（`sb_publishable_...`）与传统 JWT anon key 都可能出现在 Dashboard，以当前项目 API 页为准
+- 改 `storage` API 签名时同步改各页面调用（尤其 `updateRecord(id, changes)`、`getRecords(filter)`）
+- 提醒设置只通过 `ReminderModal` 确定保存，不要改回页内即时保存卡片
