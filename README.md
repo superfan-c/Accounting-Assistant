@@ -82,6 +82,20 @@ REACT_APP_VAPID_PUBLIC_KEY=<web-push 公钥>
 
 偏好（背景、字体、语言、头像）存在浏览器 `localStorage`；记账数据全部走云端，必须登录后才能读写。
 
+预览图在 [`assets/`](./assets/) 目录：
+
+| 页面 | 预览 |
+|------|------|
+| 记一笔 | [assets/1.png](./assets/1.png) |
+| 明细 | [assets/2.png](./assets/2.png) |
+| 统计 | [assets/3.png](./assets/3.png) |
+| 个人中心 | [assets/4.png](./assets/4.png) |
+| 设置 | [assets/5.png](./assets/5.png) |
+| 记账提醒 | [assets/6.png](./assets/6.png) |
+| 登录 | [assets/7.png](./assets/7.png) |
+| 注册 | [assets/8.png](./assets/8.png) |
+| 忘记密码 | [assets/9.png](./assets/9.png) |
+
 ---
 
 ## 当前 Supabase 配置
