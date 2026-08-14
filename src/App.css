@@ -537,6 +537,143 @@
   color: var(--muted);
 }
 
+.profile-nav-item + .profile-nav-item {
+  margin-top: 8px;
+}
+
+.budget-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(47, 111, 237, 0.12);
+  box-shadow: 0 4px 14px rgba(31, 41, 55, 0.05);
+}
+
+.budget-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.budget-bar-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.budget-bar-row .budget-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-meta {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.budget-meta.is-green {
+  color: #389e0d;
+}
+
+.budget-meta.is-yellow {
+  color: #d48806;
+}
+
+.budget-meta.is-red {
+  color: #cf1322;
+}
+
+.budget-bar {
+  display: flex;
+  height: 18px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eef2f7;
+}
+
+.budget-bar-seg {
+  height: 100%;
+  flex: 0 0 auto;
+  background-size: 14px 14px;
+}
+
+.budget-bar-seg.green {
+  background-color: #52c41a;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #73d13d 0 7px,
+    #389e0d 7px 14px
+  );
+}
+
+.budget-bar-seg.yellow {
+  background-color: #faad14;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #ffd666 0 7px,
+    #d48806 7px 14px
+  );
+}
+
+.budget-bar-seg.red {
+  background-color: #ff4d4f;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #ff7875 0 7px,
+    #cf1322 7px 14px
+  );
+}
+
+.budget-cat-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.budget-cat-row-head {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.budget-cat-head {
+  margin: 16px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.budget-cat-editor {
+  margin-top: 8px;
+  max-height: 240px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.budget-cat-edit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.budget-cat-edit-name {
+  font-size: 14px;
+}
+
+.budget-alert-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
 .login-feature-row {
   display: flex;
   justify-content: space-between;

@@ -55,24 +55,29 @@ src/
   lib/push.ts                # Web Push 订阅
   storage.ts                 # 云端 CRUD（必须已登录）
   reminderStorage.ts         # 提醒设置 + 推送订阅（云端）
+  budgetStorage.ts           # 预算设置 + 分类预算 + 本月进度
   settings.ts                # 本地 AppSettings + 字体/语言应用
   context/AuthContext.tsx    # 登录态
   context/SettingsContext.tsx# 设置 + t()
   i18n/translations.ts       # zh / en / ja
   pages/EmailLogin.tsx       # 邮箱 + 密码（登录 / 注册 / 忘记密码）
-  pages/AddRecord.tsx        # 记账
+  pages/AddRecord.tsx        # 记账 + 首页预算进度条
   pages/RecordList.tsx       # 明细（按月/年、编辑删除、导出）
   pages/Statistics.tsx       # 收支占比饼图 + 近30天双折线
-  pages/Profile.tsx          # 个人中心、设置入口、记账提醒导航
+  pages/Profile.tsx          # 个人中心、设置入口、记账提醒 / 预算管理导航
   pages/CategoryManage.tsx   # 分类管理
   components/RecordForm.tsx  # 记账/编辑表单
   components/SettingsModal.tsx
   components/ReminderModal.tsx  # 提醒弹窗：开关/时间/模板，确定才保存
+  components/BudgetModal.tsx    # 预算弹窗：开关/月预算/分类预算，确定才保存
+  components/BudgetProgressCard.tsx
+  components/BudgetAlertModal.tsx  # 50%/80%/100% 各弹一次
   layouts/MainLayout.tsx     # Tab 常驻保活 + 背景
 supabase/
-  schema.sql                 # 表 + RLS + 默认分类触发器 + 提醒表
+  schema.sql                 # 表 + RLS + 默认分类触发器 + 提醒表 + 预算表
   reminder.sql               # 已有库补提醒表
-  functions/send-reminders/  # 到点检查并发送 Web Push
+  budget.sql                 # 已有库补预算表
+  functions/send-reminders/  # 到点检查并发送记账提醒 Web Push
   config.toml                # send-reminders 的 verify_jwt = false
   email-otp-template.html    # 旧 OTP 模板（密码登录后不再需要）
 public/
@@ -96,6 +101,8 @@ Secrets 在左侧 **Edge Functions → Secrets**（不是右上角齿轮的 Proj
 - **records**：`id, user_id, amount(分), type, category_id, date, note, created_at`
 - **reminder_settings**：`user_id, enabled, remind_time（北京时间）, template_key, message_body, last_sent_on`
 - **reminder_subscriptions**：Web Push 订阅（endpoint / p256dh / auth）
+- **budget_settings**：`user_id, enabled, month_amount（分）, popup_half/yellow/red 月份标记`
+- **budget_categories**：`user_id, category_id, amount（分）, popup 黄红月份标记`
 - RLS：仅 `auth.uid() = user_id` 可读写
 - 新用户注册后由触发器 `handle_new_user_categories` 写入默认分类（前端不再 init 默认分类）
 
@@ -133,9 +140,10 @@ Secrets 在左侧 **Edge Functions → Secrets**（不是右上角齿轮的 Proj
 - 明细：按月/年、搜索、卡片边框、左滑/弹窗编辑删除、CSV 导出
 - 统计：月收支结余、支出/收入分类饼图、近 30 天收入+支出双折线
 - 分类管理：增删改；有记录的分类不可删
-- 我的：脱敏邮箱、头像上传、统计卡片、记账提醒导航行、导出、退出
+- 我的：脱敏邮箱、头像上传、统计卡片、记账提醒导航行、预算管理导航行、导出、退出
 - 设置（我的 → 设置）：背景预设/上传图、字体、语言 zh/en/ja、头像
 - 记账提醒（我的 → 导航打开 `ReminderModal`）：开关 + 北京时间每天固定时刻 + 文案模板；**确定才保存，取消/X 不保存，点遮罩不关闭**（`maskClosable={false}`）。不要再加「立刻试一条通知」测试按钮。弹窗里不要写「几分钟后」或「点通知会打开网站」那两段说明。
+- 预算管理（我的 → 导航打开 `BudgetModal`）：开关 + 本月支出预算 + 可选分类预算；**确定才保存，取消/X 不保存，点遮罩不关闭**。首页 `BudgetProgressCard`：只显示金额 + 静态条纹分段条（无边框、无分隔线），0–50% 绿、50–80% 黄、80%+ 红。`BudgetAlertModal`：50%「预算已过半」、80%「预算预警」、100%「预算警告」，本月每个节点只弹一次。不要做预算 Web Push。
 
 ## 9. 记账提醒（Web Push）
 
@@ -156,6 +164,8 @@ Edge Function Secrets：`VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJEC
 - 背景类名：`bg-default|mint|sunset|ocean|custom`（`src/utils/background.ts`）
 - 弹窗统一右上角 X 关闭（受控 `Modal`，`closable`）
 - 记账提醒弹窗：`width={420}`、`centered`、`maskClosable={false}`，底部确定/取消
+- 预算管理弹窗：同样 `width={420}`、`centered`、`maskClosable={false}`，底部确定/取消
+- 预算超支提示：单按钮「知道了」，`maskClosable={false}`
 
 ## 11. 本地开发
 
@@ -168,7 +178,7 @@ npm run build
 首次上线检查清单：
 
 1. `.env` 已填 URL + Key + `REACT_APP_VAPID_PUBLIC_KEY`
-2. SQL Editor 已执行 `supabase/schema.sql`（已有库补执行 `supabase/reminder.sql`）
+2. SQL Editor 已执行 `supabase/schema.sql`（已有库补执行 `supabase/reminder.sql`、`supabase/budget.sql`）
 3. Authentication → Providers → Email 已开启，**Confirm email 已关闭**
 4. Redirect URLs 已包含 `http://localhost:5173/login**`（及线上地址）
 5. 已生成 VAPID 密钥：`npx web-push generate-vapid-keys`
@@ -181,3 +191,4 @@ npm run build
 - Publishable key（`sb_publishable_...`）与传统 JWT anon key 都可能出现在 Dashboard，以当前项目 API 页为准
 - 改 `storage` API 签名时同步改各页面调用（尤其 `updateRecord(id, changes)`、`getRecords(filter)`）
 - 提醒设置只通过 `ReminderModal` 确定保存，不要改回页内即时保存卡片
+- 预算设置只通过 `BudgetModal` 确定保存；黄/红弹窗本月每个节点只一次，不要改成每次进入都弹

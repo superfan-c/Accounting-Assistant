@@ -1,8 +1,10 @@
 import { message } from 'antd'
+import BudgetProgressCard from '../components/BudgetProgressCard'
 import RecordForm from '../components/RecordForm'
 import { useSettings } from '../context/SettingsContext'
 import { saveRecord } from '../storage'
 import type { Record } from '../types'
+import { notifyBudgetChanged } from '../utils/budget'
 
 export default function AddRecord() {
   const { t } = useSettings()
@@ -15,6 +17,7 @@ export default function AddRecord() {
       date: record.date,
       note: record.note,
     })
+    notifyBudgetChanged()
     message.success('记账成功')
   }
 
@@ -24,6 +27,7 @@ export default function AddRecord() {
         <span className="title-icon">✍️</span>
         {t('addRecord')}
       </h2>
+      <BudgetProgressCard />
       <RecordForm submitText={t('addRecord')} onSubmit={handleSubmit} />
     </div>
   )

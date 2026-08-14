@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SettingsModal from '../components/SettingsModal'
 import ReminderModal from '../components/ReminderModal'
+import BudgetModal from '../components/BudgetModal'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import {
@@ -27,7 +28,11 @@ import {
   DEFAULT_REMINDER,
   getReminderSettings,
 } from '../reminderStorage'
-import type { ReminderSettings } from '../types'
+import {
+  DEFAULT_BUDGET,
+  getBudgetSettings,
+} from '../budgetStorage'
+import type { BudgetSettings, ReminderSettings } from '../types'
 
 function maskEmail(email?: string | null, fallback = '未绑定邮箱') {
   if (!email) return fallback
@@ -49,6 +54,8 @@ export default function Profile({ active = true }: { active?: boolean }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reminderOpen, setReminderOpen] = useState(false)
   const [reminder, setReminder] = useState<ReminderSettings>(DEFAULT_REMINDER)
+  const [budgetOpen, setBudgetOpen] = useState(false)
+  const [budget, setBudget] = useState<BudgetSettings>(DEFAULT_BUDGET)
 
   const avatar = user?.id ? settings.avatars[user.id] : undefined
 
@@ -75,6 +82,9 @@ export default function Profile({ active = true }: { active?: boolean }) {
       void getReminderSettings()
         .then(setReminder)
         .catch(() => setReminder(DEFAULT_REMINDER))
+      void getBudgetSettings()
+        .then(setBudget)
+        .catch(() => setBudget(DEFAULT_BUDGET))
     }
   }, [active, load])
 
@@ -216,6 +226,20 @@ export default function Profile({ active = true }: { active?: boolean }) {
         </span>
       </button>
 
+      <button
+        type="button"
+        className="profile-nav-item"
+        onClick={() => setBudgetOpen(true)}
+      >
+        <span>💰 {t('budget')}</span>
+        <span className="profile-nav-extra">
+          {budget.enabled && budget.monthAmount > 0
+            ? `${t('budgetOn')} ¥${formatYuan(budget.monthAmount)}`
+            : t('budgetOff')}
+          <span className="profile-nav-arrow">›</span>
+        </span>
+      </button>
+
       <Button
         block
         size="large"
@@ -245,6 +269,11 @@ export default function Profile({ active = true }: { active?: boolean }) {
         open={reminderOpen}
         onClose={() => setReminderOpen(false)}
         onSaved={setReminder}
+      />
+      <BudgetModal
+        open={budgetOpen}
+        onClose={() => setBudgetOpen(false)}
+        onSaved={setBudget}
       />
     </div>
   )

@@ -69,6 +69,29 @@ export type I18nKey =
   | 'reminderSaved'
   | 'reminderLoading'
   | 'permDenied'
+  | 'budget'
+  | 'budgetEnable'
+  | 'budgetMonth'
+  | 'budgetMonthPh'
+  | 'budgetCategories'
+  | 'budgetCategoryHint'
+  | 'budgetOn'
+  | 'budgetOff'
+  | 'budgetOk'
+  | 'budgetCancel'
+  | 'budgetSaved'
+  | 'budgetLoading'
+  | 'budgetNeedAmount'
+  | 'budgetTitle'
+  | 'budgetUsed'
+  | 'budgetAlertTitle'
+  | 'budgetAlertOk'
+  | 'budgetAlertHalf'
+  | 'budgetAlertWarn'
+  | 'budgetAlertOver'
+  | 'budgetAlertCatHalf'
+  | 'budgetAlertCatWarn'
+  | 'budgetAlertCatOver'
 
 const dict: Record<Lang, Record<I18nKey, string>> = {
   zh: {
@@ -140,6 +163,29 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
     reminderSaved: '提醒设置已保存',
     reminderLoading: '加载中…',
     permDenied: '通知权限被拒绝，关闭网页后将收不到提醒',
+    budget: '预算管理',
+    budgetEnable: '开启预算',
+    budgetMonth: '本月支出预算',
+    budgetMonthPh: '例如 3000',
+    budgetCategories: '分类预算（可选）',
+    budgetCategoryHint: '留空表示该分类不设上限，只统计月预算。',
+    budgetOn: '已开启',
+    budgetOff: '已关闭',
+    budgetOk: '确定',
+    budgetCancel: '取消',
+    budgetSaved: '预算设置已保存',
+    budgetLoading: '加载中…',
+    budgetNeedAmount: '请先填写本月支出预算金额',
+    budgetTitle: '本月预算：',
+    budgetUsed: '已用',
+    budgetAlertTitle: '预算提醒',
+    budgetAlertOk: '知道了',
+    budgetAlertHalf: '预算已过半',
+    budgetAlertWarn: '预算预警',
+    budgetAlertOver: '预算警告',
+    budgetAlertCatHalf: '{name} 预算已过半',
+    budgetAlertCatWarn: '{name} 预算预警',
+    budgetAlertCatOver: '{name} 预算警告',
   },
   en: {
     appName: 'Ledger Assistant',
@@ -210,6 +256,29 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
     reminderSaved: 'Reminder saved',
     reminderLoading: 'Loading…',
     permDenied: 'Notification permission denied; no alerts after the tab is closed',
+    budget: 'Budget',
+    budgetEnable: 'Enable budget',
+    budgetMonth: 'Monthly expense budget',
+    budgetMonthPh: 'e.g. 3000',
+    budgetCategories: 'Category budgets (optional)',
+    budgetCategoryHint: 'Leave empty to skip a category cap. Monthly budget still applies.',
+    budgetOn: 'On',
+    budgetOff: 'Off',
+    budgetOk: 'OK',
+    budgetCancel: 'Cancel',
+    budgetSaved: 'Budget saved',
+    budgetLoading: 'Loading…',
+    budgetNeedAmount: 'Enter a monthly expense budget first',
+    budgetTitle: 'This month:',
+    budgetUsed: 'Spent',
+    budgetAlertTitle: 'Budget alert',
+    budgetAlertOk: 'Got it',
+    budgetAlertHalf: 'Budget is halfway used',
+    budgetAlertWarn: 'Budget warning',
+    budgetAlertOver: 'Over budget',
+    budgetAlertCatHalf: '{name} is halfway used',
+    budgetAlertCatWarn: '{name} budget warning',
+    budgetAlertCatOver: '{name} is over budget',
   },
   ja: {
     appName: '記帳アシスタント',
@@ -280,6 +349,29 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
     reminderSaved: 'リマインダーを保存しました',
     reminderLoading: '読み込み中…',
     permDenied: '通知が拒否されました。タブを閉じると通知できません',
+    budget: '予算管理',
+    budgetEnable: '予算を有効にする',
+    budgetMonth: '今月の支出予算',
+    budgetMonthPh: '例：3000',
+    budgetCategories: 'カテゴリ予算（任意）',
+    budgetCategoryHint: '空欄はそのカテゴリに上限なし。月予算は引き続き適用されます。',
+    budgetOn: 'オン',
+    budgetOff: 'オフ',
+    budgetOk: '確定',
+    budgetCancel: 'キャンセル',
+    budgetSaved: '予算を保存しました',
+    budgetLoading: '読み込み中…',
+    budgetNeedAmount: '今月の支出予算を入力してください',
+    budgetTitle: '今月の予算：',
+    budgetUsed: '使用',
+    budgetAlertTitle: '予算アラート',
+    budgetAlertOk: '了解',
+    budgetAlertHalf: '予算が半分を超えました',
+    budgetAlertWarn: '予算注意',
+    budgetAlertOver: '予算警告',
+    budgetAlertCatHalf: '{name} の予算が半分を超えました',
+    budgetAlertCatWarn: '{name} の予算注意',
+    budgetAlertCatOver: '{name} の予算警告',
   },
 }
 

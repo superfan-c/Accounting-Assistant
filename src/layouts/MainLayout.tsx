@@ -7,6 +7,7 @@ import {
 } from 'antd-mobile-icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AppLogo from '../components/AppLogo'
+import BudgetAlertModal from '../components/BudgetAlertModal'
 import { useSettings } from '../context/SettingsContext'
 import AddRecord from '../pages/AddRecord'
 import Profile from '../pages/Profile'
@@ -64,6 +65,7 @@ export default function MainLayout() {
           <Profile active={active === '/profile'} />
         </div>
       </div>
+      <BudgetAlertModal />
       <div className="tab-bar-wrap">
         <TabBar activeKey={active} onChange={(key) => navigate(key)}>
           {tabs.map((item) => (

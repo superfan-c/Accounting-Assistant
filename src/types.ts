@@ -39,3 +39,29 @@ export interface ReminderSettings {
   templateKey: ReminderTemplateKey
   messageBody: string
 }
+
+export interface BudgetSettings {
+  enabled: boolean
+  monthAmount: number
+  popupHalfMonth: string | null
+  popupYellowMonth: string | null
+  popupRedMonth: string | null
+}
+
+export interface CategoryBudget {
+  categoryId: string
+  amount: number
+  popupHalfMonth: string | null
+  popupYellowMonth: string | null
+  popupRedMonth: string | null
+}
+
+export type BudgetAlertKind = 'month' | 'category'
+export type BudgetAlertLevel = 'half' | 'warn' | 'over'
+
+export interface BudgetAlert {
+  kind: BudgetAlertKind
+  level: BudgetAlertLevel
+  categoryId?: string
+  categoryName?: string
+}

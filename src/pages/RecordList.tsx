@@ -22,6 +22,7 @@ import {
 } from '../storage'
 import type { Category, Record } from '../types'
 import { formatYuan } from '../utils/format'
+import { notifyBudgetChanged } from '../utils/budget'
 import { useSettings } from '../context/SettingsContext'
 
 interface GroupedMonth {
@@ -120,6 +121,7 @@ export default function RecordList({ active = true }: Props) {
 
   const handleDelete = async (id: string) => {
     await deleteRecord(id)
+    notifyBudgetChanged()
     message.success('已删除')
     setDeleteId(null)
     setActionRecord(null)
@@ -135,6 +137,7 @@ export default function RecordList({ active = true }: Props) {
       note: record.note,
     })
     message.success('修改成功')
+    notifyBudgetChanged()
     setEditing(null)
     await load()
   }

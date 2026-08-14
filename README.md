@@ -77,6 +77,7 @@ REACT_APP_VAPID_PUBLIC_KEY=<web-push 公钥>
 | 我的 | 脱敏邮箱、头像、记账天数 / 笔数 / 连续天数、数据导出、退出。 |
 | 设置 | 背景主题（含上传图）、字体、语言 zh / en / ja、头像。 |
 | 记账提醒 | 个人中心入口 → 弹窗设置开关、每天时刻、通知文案；点确定才保存。 |
+| 预算管理 | 个人中心入口 → 弹窗设置开关、本月支出预算、可选分类预算。首页只显示金额和条纹进度条（0–50% 绿、50–80% 黄、80% 以上红）。50% / 80% / 100% 各弹一次：预算已过半、预算预警、预算警告。 |
 
 金额在库里按 **分** 存储，界面按 **元** 展示。
 
@@ -108,7 +109,7 @@ REACT_APP_VAPID_PUBLIC_KEY=<web-push 公钥>
 | Dashboard | [打开项目](https://supabase.com/dashboard/project/fvevsvsbyzougcjannqh) |
 | 客户端密钥 | Dashboard → **Project Settings → API** 里的 anon / publishable key，填到 `.env` 的 `REACT_APP_SUPABASE_ANON_KEY` |
 
-表结构在 `supabase/schema.sql`。已有库若还没有提醒表，再执行 `supabase/reminder.sql`。
+表结构在 `supabase/schema.sql`。已有库若还没有提醒表，再执行 `supabase/reminder.sql`；若还没有预算表，再执行 `supabase/budget.sql`。
 
 主要表：
 
@@ -116,6 +117,8 @@ REACT_APP_VAPID_PUBLIC_KEY=<web-push 公钥>
 - `records`：记账（金额单位：分）
 - `reminder_settings`：提醒开关、北京时间时刻、文案、当天是否已推过
 - `reminder_subscriptions`：Web Push 订阅
+- `budget_settings`：预算开关、月支出预算、本月黄/红弹窗是否已提示
+- `budget_categories`：分类支出预算
 
 RLS：只能读写自己的数据（`auth.uid() = user_id`）。
 
@@ -212,4 +215,4 @@ Authorization: Bearer <CRON_SECRET>
 
 保存后可在 Cron 任务日志或 Edge Function Logs 里看到每分钟的调用。返回 `{"ok":true,"sent":0,...}` 表示扫过了但还没到点或当天已记过账，属于正常。
 
-前端入口：我的 → **记账提醒** → 弹窗改开关 / 时间 / 模板 → **确定** 保存。
+前端入口：我的 → **记账提醒** → 弹窗改开关 / 时间 / 模板 → **确定** 保存。预算：我的 → **预算管理** → 开关 + 本月支出金额 + 可选分类预算 → **确定** 保存。已有库需在 SQL Editor 执行 `supabase/budget.sql`。
