@@ -104,6 +104,23 @@ function buildHeatmap(countsByDate: Map<string, number>): HeatmapWeek[] {
   return weeks
 }
 
+/** 指定自然月：按日从左到右的打卡格子（横坐标为当月日期） */
+export function buildMonthHeatmapDays(
+  countsByDate: Map<string, number>,
+  month: dayjs.Dayjs,
+): HeatmapCell[] {
+  const start = month.startOf('month')
+  const daysInMonth = month.daysInMonth()
+  const cells: HeatmapCell[] = []
+  for (let i = 0; i < daysInMonth; i += 1) {
+    const d = start.add(i, 'day')
+    const key = dateKey(d)
+    const count = countsByDate.get(key) ?? 0
+    cells.push({ date: key, count, level: countToLevel(count) })
+  }
+  return cells
+}
+
 export function buildStreakGamificationStats(records: Record[]): StreakGamificationStats {
   const countsByDate = new Map<string, number>()
   const months: string[] = []

@@ -25,7 +25,7 @@ alwaysApply: true
 | CSV | PapaParse | 5 |
 | 后端/数据 | **Supabase**（Auth + PostgreSQL + RLS） | @supabase/supabase-js 2 |
 | 记账提醒 | Web Push + SW + Edge Function `send-reminders` + Cron | `public/sw.js` |
-| 本地偏好 | `localStorage`（背景、字体、语言、头像） | **不**再用 localforage |
+| 本地偏好 | `localStorage`（背景、字体、语言、头像、勋章已读/佩戴） | **不**再用 localforage |
 
 环境变量（Vite 已配置 `envPrefix: ['VITE_', 'REACT_APP_']`）：
 
@@ -55,28 +55,34 @@ src/
   lib/push.ts                # Web Push 订阅
   storage.ts                 # 云端 CRUD（必须已登录）
   reminderStorage.ts         # 提醒设置 + 推送订阅（云端）
-  budgetStorage.ts           # 预算设置 + 分类预算 + 本月进度
-  gamification/              # 打卡热力图、勋章、称号（本地已读/佩戴）
+  budgetStorage.ts           # 预算设置 + 分类预算 + 本月进度 + 弹窗月份标记
+  gamification/              # 打卡热力图、勋章、称号（本地已读/佩戴/获得日）
+    achievements.ts          # 五档主勋章 + 四枚彩蛋定义
+    streakStats.ts           # 热力图、连续/累计、解锁判定
+    gamificationStorage.ts   # localStorage：已读、获得日、佩戴
+    useGamificationStats.ts
   settings.ts                # 本地 AppSettings + 字体/语言应用
   context/AuthContext.tsx    # 登录态
   context/SettingsContext.tsx# 设置 + t()
   i18n/translations.ts       # zh / en / ja
+  i18n/achievementTranslations.ts  # 勋章/热力图文案
   pages/EmailLogin.tsx       # 邮箱 + 密码（登录 / 注册 / 忘记密码）
   pages/AddRecord.tsx        # 记账 + 首页预算进度条
   pages/RecordList.tsx       # 明细（按月/年、编辑删除、导出）
-  pages/Statistics.tsx       # 收支占比饼图 + 近30天双折线 + 打卡热力图/勋章
-  pages/Profile.tsx          # 个人中心、称号、设置入口、记账提醒 / 预算管理导航
+  pages/Statistics.tsx       # 按所选月份：热力图 + 收支结余/饼图/本月趋势
+  pages/Profile.tsx          # 个人中心、佩戴勋章、称号、提醒/预算导航
   pages/CategoryManage.tsx   # 分类管理
   components/RecordForm.tsx  # 记账/编辑表单
   components/SettingsModal.tsx
   components/ReminderModal.tsx  # 提醒弹窗：开关/时间/模板，确定才保存
   components/BudgetModal.tsx    # 预算弹窗：开关/月预算/分类预算，确定才保存
-  components/BudgetProgressCard.tsx
-  components/BudgetAlertModal.tsx  # 50%/80%/100% 各弹一次
-  components/StreakHeatmap.tsx
-  components/BadgeGrid.tsx
-  components/MyBadgesModal.tsx
-  components/AchievementUnlockModal.tsx
+  components/BudgetProgressCard.tsx  # 首页条纹进度条
+  components/BudgetAlertModal.tsx    # 50%/80%/100% 各弹一次
+  components/StreakHeatmap.tsx       # 统计页按月打卡日历
+  components/BadgeGrid.tsx           # 成就墙组件（统计页已不展示，勋章在「我的勋章」）
+  components/BadgeCard.tsx
+  components/MyBadgesModal.tsx       # 悬停介绍、点击选中、已点亮可佩戴
+  components/AchievementUnlockModal.tsx  # 首次解锁：勋章 + 介绍
   layouts/MainLayout.tsx     # Tab 常驻保活 + 背景
 supabase/
   schema.sql                 # 表 + RLS + 默认分类触发器 + 提醒表 + 预算表
@@ -106,8 +112,9 @@ Secrets 在左侧 **Edge Functions → Secrets**（不是右上角齿轮的 Proj
 - **records**：`id, user_id, amount(分), type, category_id, date, note, created_at`
 - **reminder_settings**：`user_id, enabled, remind_time（北京时间）, template_key, message_body, last_sent_on`
 - **reminder_subscriptions**：Web Push 订阅（endpoint / p256dh / auth）
-- **budget_settings**：`user_id, enabled, month_amount（分）, popup_half/yellow/red 月份标记`
-- **budget_categories**：`user_id, category_id, amount（分）, popup 黄红月份标记`
+- **budget_settings**：`user_id, enabled, month_amount（分）, popup_half_month / popup_yellow_month / popup_red_month`
+- **budget_categories**：`user_id, category_id, amount（分）, popup_half/yellow/red 月份标记`，`(user_id, category_id)` 唯一
+- 预算只统计支出；弹窗月份标记用于「本月每个节点只弹一次」
 - RLS：仅 `auth.uid() = user_id` 可读写
 - 新用户注册后由触发器 `handle_new_user_categories` 写入默认分类（前端不再 init 默认分类）
 
@@ -143,16 +150,52 @@ Secrets 在左侧 **Edge Functions → Secrets**（不是右上角齿轮的 Proj
 
 - 记账：支出/收入 Segmented（带图标）、分类、金额、日期、备注
 - 明细：按月/年、搜索、卡片边框、左滑/弹窗编辑删除、CSV 导出
-- 统计：月收支结余、分类饼图、近 30 天趋势；**打卡热力图** + 连续摘要 + 四档主勋章与彩蛋成就墙
+- 统计：按所选月份展示打卡热力图、月收支结余、分类饼图、**本月收支趋势**；勋章墙只在「我的勋章」，统计页不要再放成就墙
 - 分类管理：增删改；有记录的分类不可删
-- 我的：脱敏邮箱、头像外圈右下展示**已佩戴勋章**（未手动佩戴则取最高档主勋章）、称号在用户名下方、统计卡片、**我的勋章**（悬停看介绍，点击选中，已解锁可佩戴替换）、记账提醒、预算管理、导出、退出
-- 设置（我的 → 设置）：背景预设/上传图、字体、语言 zh/en/ja、头像
-- 记账提醒（我的 → 导航打开 `ReminderModal`）：开关 + 北京时间每天固定时刻 + 文案模板；**确定才保存，取消/X 不保存，点遮罩不关闭**（`maskClosable={false}`）。不要再加「立刻试一条通知」测试按钮。弹窗里不要写「几分钟后」或「点通知会打开网站」那两段说明。
-- 预算管理（我的 → 导航打开 `BudgetModal`）：…（见上）。`AchievementUnlockModal`：首次达里程碑弹解锁文案；已读存 localStorage。主勋章看**最长连续** 7/30/182/365；彩蛋看累计 100 天、100 笔、连续 4 月、最长连续 365。
+- 我的：脱敏邮箱、头像外圈右下展示**已佩戴勋章**（未手动佩戴则取最高档主勋章）、称号在用户名下方（不要和用户名并排）、统计卡片、**我的勋章**、记账提醒、预算管理、导出、退出。导航右侧只显示状态：「已解锁」/「已开启」，不要写 1/9、提醒时刻、预算金额
+- 设置（我的 → 设置）：背景预设/上传图、字体、语言 zh/en/ja、头像（头像只在设置里换，个人中心头像不要相机按钮）
+- 记账提醒：见第 11 节
+- 预算管理：见第 9 节
+- 打卡勋章：见第 10 节
 
-## 9. 记账提醒（Web Push）
+## 9. 预算管理
+
+入口：我的 → 打开 `BudgetModal`。**确定才保存，取消/X 不保存，点遮罩不关闭**（`maskClosable={false}`，`width={420}`、`centered`）。不要改回页内即时保存。
+
+- 只统计**支出**；开关 + 本月总额（分）+ 可选分类预算
+- 首页 `BudgetProgressCard`：开启且月预算 > 0 才显示。左标「本月预算：」，金额行 `已用 ¥x / ¥y`。进度条**分段**着色：0–50% 绿、50–80% 黄、80%+ 红，不要整条变色，不要超支百分比文案
+- `BudgetAlertModal`：应用内提醒，**不要做预算 Web Push**。50%「预算已过半」、80%「预算预警」、100%「预算警告」；分类同文案并带分类名。本月每个节点只弹一次（`popup_half/yellow/red_month`）。单按钮「知道了」，`maskClosable={false}`
+- 已有库补执行 `supabase/budget.sql`
+
+## 10. 打卡勋章
+
+定义在 `src/gamification/achievements.ts`，判定在 `streakStats.ts`。主勋章看**最长连续**（不是当前连续）；彩蛋看累计，断签不清零。
+
+| id | 勋章 | 称号 | 条件 |
+|----|------|------|------|
+| `streak_1` | 开笔入账 | 记账书童 | 任意一天打卡 |
+| `streak_7` | 七日笔耕 | 萌芽账手 | 最长连续 7 |
+| `streak_30` | 三十而立 | 月下账房 | 最长连续 30 |
+| `streak_182` | 半载不辍 | 铁算盘 | 最长连续 182 |
+| `streak_365` | 滴水穿石 | 一代账王 | 最长连续 365 |
+| `total_100_days` | 老账房 | 老账房 | 累计 100 天 |
+| `total_100_entries` | 百分百 | 百分百 | 累计 100 笔 |
+| `four_seasons` | 四季掌柜 | 四季掌柜 | 连续 4 个自然月有记录 |
+| `perfect_year` | 零断签 | 零断签 | 最长连续 365 |
+
+交互与存储：
+
+- `AchievementUnlockModal`：首次达里程碑弹出。内容只保留**勋章 + 介绍**（不要英文 STREAK 条、不要重复名称、不要「可佩戴称号」行）。底部确定 / 现在佩戴。已读存 `ledger_seen_achievements`
+- `MyBadgesModal`：悬停看介绍，点击选中框，已点亮可佩戴，未点亮「佩戴」灰色禁用。未解锁显示**灰色原勋章**，不要改成锁
+- 头像圈右下：`getDisplayBadgeId`（已佩戴且仍解锁，否则最高档主勋章）。佩戴存 `ledger_equipped_badge`
+- 获得日期：`ledger_achievement_unlocked_at`（`syncUnlockTimes` / `ensureUnlockTime`）
+- 这些 key 只在本机，不要改成云端，除非产品明确要求
+
+## 11. 记账提醒（Web Push）
 
 规则：北京时间钟点（例如 `21:00`），到点后约 5 分钟窗口内检查；**当天还没记账** 才推送。点通知打开网站：有 token 进「记一笔」，没有则进登录页。
+
+入口：我的 → 打开 `ReminderModal`。开关 + 北京时间每天固定时刻 + 文案模板；**确定才保存，取消/X 不保存，点遮罩不关闭**（`maskClosable={false}`）。不要再加「立刻试一条通知」测试按钮。弹窗里不要写「几分钟后」或「点通知会打开网站」那两段说明。
 
 Edge Function Secrets：`VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJECT`、`CRON_SECRET`。
 
@@ -163,16 +206,18 @@ Edge Function Secrets：`VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`、`VAPID_SUBJEC
 
 限制：电脑关机/没网/拒绝通知权限则收不到。
 
-## 10. UI / 路由约定
+## 12. UI / 路由约定
 
 - 主 Tab 用 `display:none` 常驻，切换保状态；进 `/categories` 会卸载 MainLayout
 - 背景类名：`bg-default|mint|sunset|ocean|custom`（`src/utils/background.ts`）
 - 弹窗统一右上角 X 关闭（受控 `Modal`，`closable`）
 - 记账提醒弹窗：`width={420}`、`centered`、`maskClosable={false}`，底部确定/取消
 - 预算管理弹窗：同样 `width={420}`、`centered`、`maskClosable={false}`，底部确定/取消
-- 预算超支提示：单按钮「知道了」，`maskClosable={false}`
+- 弹窗右上角 X：不要带彩色焦点边框（与其他弹窗 X 一致）
+- 成就解锁弹窗：`width={420}`、`centered`、`maskClosable={false}`，内容只有勋章 + 介绍
+- 我的勋章弹窗：同样尺寸；底部确定 + 佩戴（未点亮禁用）
 
-## 11. 本地开发
+## 13. 本地开发
 
 ```bash
 npm install
@@ -187,13 +232,16 @@ npm run build
 3. Authentication → Providers → Email 已开启，**Confirm email 已关闭**
 4. Redirect URLs 已包含 `http://localhost:5173/login**`（及线上地址）
 5. 已生成 VAPID 密钥：`npx web-push generate-vapid-keys`
-6. Edge Function `send-reminders` 已部署，Secrets 见第 9 节
+6. Edge Function `send-reminders` 已部署，Secrets 见第 11 节
 7. Integrations → Cron 每分钟 POST `send-reminders`
 
-## 12. 演进注意
+## 14. 演进注意
 
 - 原 localforage 方案已废弃
 - Publishable key（`sb_publishable_...`）与传统 JWT anon key 都可能出现在 Dashboard，以当前项目 API 页为准
 - 改 `storage` API 签名时同步改各页面调用（尤其 `updateRecord(id, changes)`、`getRecords(filter)`）
 - 提醒设置只通过 `ReminderModal` 确定保存，不要改回页内即时保存卡片
-- 预算设置只通过 `BudgetModal` 确定保存；黄/红弹窗本月每个节点只一次，不要改成每次进入都弹
+- 预算设置只通过 `BudgetModal` 确定保存；50%/80%/100% 弹窗本月每个节点只一次，不要改成每次进入都弹；不要给预算加 Web Push
+- 主勋章看最长连续，不要改成当前连续；未解锁用灰色原图标，不要改回锁
+- 解锁弹窗保持「勋章 + 介绍」；勋章已读/佩戴只存 localStorage，不要每次进统计都重弹
+- 个人中心导航右侧只显示状态，不要写 1/9、提醒时刻、预算金额

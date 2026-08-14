@@ -4,7 +4,6 @@ export type AchievementI18nKey =
   | 'heatmapTitle'
   | 'heatmapLess'
   | 'heatmapMore'
-  | 'heatmapRange'
   | 'streakCurrent'
   | 'streakLongest'
   | 'streakTotalDays'
@@ -70,7 +69,6 @@ const zh: Record<AchievementI18nKey, string> = {
   heatmapTitle: '记账打卡',
   heatmapLess: '少',
   heatmapMore: '多',
-  heatmapRange: '{from} 至 {to}',
   streakCurrent: '当前连续',
   streakLongest: '最长连续',
   streakTotalDays: '累计记账',
@@ -138,7 +136,6 @@ const en: Record<AchievementI18nKey, string> = {
   heatmapTitle: 'Check-in calendar',
   heatmapLess: 'Less',
   heatmapMore: 'More',
-  heatmapRange: '{from} – {to}',
   streakCurrent: 'Current streak',
   streakLongest: 'Best streak',
   streakTotalDays: 'Total days',
@@ -206,7 +203,6 @@ const ja: Record<AchievementI18nKey, string> = {
   heatmapTitle: '記帳カレンダー',
   heatmapLess: '少',
   heatmapMore: '多',
-  heatmapRange: '{from} ～ {to}',
   streakCurrent: '現在の連続',
   streakLongest: '最長連続',
   streakTotalDays: '累計日数',

@@ -1,9 +1,8 @@
-import { Col, DatePicker, Empty, Row, Spin, Statistic } from 'antd'
+import { Col, DatePicker, Empty, Row, Statistic } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import BadgeGrid from '../components/BadgeGrid'
 import StreakHeatmap from '../components/StreakHeatmap'
-import { useGamificationStats } from '../gamification/useGamificationStats'
+import { buildMonthHeatmapDays } from '../gamification/streakStats'
 import {
   CartesianGrid,
   Cell,
@@ -108,10 +107,8 @@ function PieBlock({
 
 export default function Statistics({ active = true }: { active?: boolean }) {
   const { t } = useSettings()
-  const { stats, loading: streakLoading } = useGamificationStats(active)
   const [month, setMonth] = useState<Dayjs>(dayjs())
   const [records, setRecords] = useState<Record[]>([])
-  const [allRecent, setAllRecent] = useState<Record[]>([])
   const [categories, setCategories] = useState<Category[]>([])
 
   const categoryMap = useMemo(() => {
@@ -123,14 +120,12 @@ export default function Statistics({ active = true }: { active?: boolean }) {
   const load = useCallback(async () => {
     const monthKey = month.format('YYYY-MM')
     try {
-      const [monthRecs, cats, all] = await Promise.all([
+      const [monthRecs, cats] = await Promise.all([
         getRecords({ month: monthKey }),
         getCategories(),
-        getRecords(),
       ])
       setRecords(monthRecs)
       setCategories(cats)
-      setAllRecent(all)
     } catch (e) {
       console.error(e)
     }
@@ -160,32 +155,41 @@ export default function Statistics({ active = true }: { active?: boolean }) {
     [records, categoryMap],
   )
 
+  const heatmapDays = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of records) {
+      const key = r.date.slice(0, 10)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return buildMonthHeatmapDays(counts, month)
+  }, [records, month])
+
   const lineData = useMemo(() => {
-    const today = dayjs().startOf('day')
+    const start = month.startOf('month')
+    const daysInMonth = month.daysInMonth()
+    const byDay = new Map<string, { expense: number; income: number }>()
+    for (const r of records) {
+      const key = r.date.slice(0, 10)
+      const cur = byDay.get(key) ?? { expense: 0, income: 0 }
+      if (r.type === 'expense') cur.expense += r.amount
+      else cur.income += r.amount
+      byDay.set(key, cur)
+    }
     const days: { date: string; expense: number; income: number }[] = []
-    for (let i = 29; i >= 0; i--) {
-      const d = today.subtract(i, 'day')
+    for (let i = 0; i < daysInMonth; i += 1) {
+      const d = start.add(i, 'day')
       const key = d.format('YYYY-MM-DD')
-      let expense = 0
-      let income = 0
-      for (const r of allRecent) {
-        if (dayjs(r.date).format('YYYY-MM-DD') !== key) continue
-        if (r.type === 'expense') expense += r.amount
-        else income += r.amount
-      }
+      const cur = byDay.get(key) ?? { expense: 0, income: 0 }
       days.push({
-        date: d.format('MM-DD'),
-        expense: fenToYuan(expense),
-        income: fenToYuan(income),
+        date: d.format('D'),
+        expense: fenToYuan(cur.expense),
+        income: fenToYuan(cur.income),
       })
     }
     return days
-  }, [allRecent])
+  }, [records, month])
 
   const hasMonthData = records.length > 0
-  const hasTrendData = allRecent.some((r) =>
-    dayjs(r.date).isAfter(dayjs().subtract(30, 'day').startOf('day')),
-  )
 
   return (
     <div className="page statistics-page">
@@ -193,28 +197,6 @@ export default function Statistics({ active = true }: { active?: boolean }) {
         <span className="title-icon">📊</span>
         {t('statistics')}
       </h2>
-
-      {streakLoading && !stats ? (
-        <div className="streak-loading">
-          <Spin />
-        </div>
-      ) : stats ? (
-        <div className="chart-block streak-gamification-block">
-          <Row gutter={8} className="streak-summary-row">
-            <Col span={8}>
-              <Statistic title={t('streakCurrent')} value={stats.currentStreak} />
-            </Col>
-            <Col span={8}>
-              <Statistic title={t('streakLongest')} value={stats.longestStreak} />
-            </Col>
-            <Col span={8}>
-              <Statistic title={t('streakTotalDays')} value={stats.totalDays} />
-            </Col>
-          </Row>
-          <StreakHeatmap weeks={stats.heatmapWeeks} />
-          <BadgeGrid stats={stats} />
-        </div>
-      ) : null}
 
       <DatePicker
         picker="month"
@@ -262,6 +244,10 @@ export default function Statistics({ active = true }: { active?: boolean }) {
             </Col>
           </Row>
 
+          <div className="chart-block">
+            <StreakHeatmap days={heatmapDays} />
+          </div>
+
           <PieBlock
             title="支出分类占比"
             data={expensePie}
@@ -275,46 +261,39 @@ export default function Statistics({ active = true }: { active?: boolean }) {
             colors={INCOME_COLORS}
             emptyText="本月暂无收入"
           />
+
+          <div className="chart-block">
+            <h3>本月收支趋势</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={lineData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={2} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => `¥${Number(v).toFixed(2)}`} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="expense"
+                  name="支出"
+                  stroke="#ff6b6b"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="income"
+                  name="收入"
+                  stroke="#51cf66"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </>
       )}
-
-      <div className="chart-block">
-        <h3>近 30 天收支趋势</h3>
-        {!hasTrendData ? (
-          <Empty
-            description="近 30 天暂无记录"
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-          />
-        ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={lineData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={4} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => `¥${Number(v).toFixed(2)}`} />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="expense"
-                name="支出"
-                stroke="#ff6b6b"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="income"
-                name="收入"
-                stroke="#51cf66"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
     </div>
   )
 }

@@ -87,7 +87,6 @@ export default function AchievementUnlockModal() {
       centered
       width={420}
       maskClosable={false}
-      autoFocus={false}
       className="achievement-unlock-modal"
     >
       <div className="achievement-unlock-body">

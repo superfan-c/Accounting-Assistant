@@ -1,16 +1,25 @@
-import dayjs from 'dayjs'
+import type { CSSProperties } from 'react'
 import type { HeatmapCell } from '../gamification/streakStats'
 import { useSettings } from '../context/SettingsContext'
 
 interface Props {
-  weeks: { days: (HeatmapCell | null)[] }[]
+  days: HeatmapCell[]
 }
 
-export default function StreakHeatmap({ weeks }: Props) {
+function axisLabel(day: number, last: number) {
+  if (day === 1 || day === last || day % 5 === 0) return String(day)
+  return ''
+}
+
+export default function StreakHeatmap({ days }: Props) {
   const { t } = useSettings()
+  const last = days.length
 
   return (
-    <div className="streak-heatmap-wrap">
+    <div
+      className="streak-heatmap-wrap"
+      style={{ '--days': last } as CSSProperties}
+    >
       <div className="streak-heatmap-head">
         <span>{t('heatmapTitle')}</span>
         <span className="streak-heatmap-legend">
@@ -21,29 +30,19 @@ export default function StreakHeatmap({ weeks }: Props) {
           <span>{t('heatmapMore')}</span>
         </span>
       </div>
-      <div className="streak-heatmap-scroll">
-        <div className="streak-heatmap">
-          {weeks.map((week, wi) => (
-            <div className="heatmap-week" key={wi}>
-              {week.days.map((cell, di) =>
-                cell ? (
-                  <span
-                    key={cell.date}
-                    className={`heatmap-cell level-${cell.level}`}
-                    title={`${cell.date} · ${cell.count}`}
-                  />
-                ) : (
-                  <span key={`${wi}-${di}`} className="heatmap-cell is-empty" />
-                ),
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="heatmap-month-bar">
+        {days.map((cell) => (
+          <span
+            key={cell.date}
+            className={`heatmap-cell level-${cell.level}`}
+            title={`${cell.date} · ${cell.count}`}
+          />
+        ))}
       </div>
-      <div className="streak-heatmap-foot">
-        {t('heatmapRange')
-          .replace('{from}', dayjs().subtract(364, 'day').format('YYYY-MM-DD'))
-          .replace('{to}', dayjs().format('YYYY-MM-DD'))}
+      <div className="heatmap-month-axis">
+        {days.map((cell, i) => (
+          <span key={cell.date}>{axisLabel(i + 1, last)}</span>
+        ))}
       </div>
     </div>
   )
