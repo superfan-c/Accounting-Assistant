@@ -6,15 +6,15 @@ import {
   Modal,
   Row,
   Statistic,
-  Upload,
   message,
 } from 'antd'
 import Papa from 'papaparse'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SettingsModal from '../components/SettingsModal'
 import ReminderModal from '../components/ReminderModal'
 import BudgetModal from '../components/BudgetModal'
+import MyBadgesModal from '../components/MyBadgesModal'
 import { useAuth } from '../context/AuthContext'
 import { useSettings } from '../context/SettingsContext'
 import {
@@ -32,6 +32,17 @@ import {
   DEFAULT_BUDGET,
   getBudgetSettings,
 } from '../budgetStorage'
+import {
+  ACHIEVEMENT_BY_ID,
+  GAMIFICATION_CHANGED_EVENT,
+} from '../gamification/achievements'
+import {
+  getDisplayBadgeId,
+  syncUnlockTimes,
+} from '../gamification/gamificationStorage'
+import { getUnlockedAchievements } from '../gamification/streakStats'
+import { useGamificationStats } from '../gamification/useGamificationStats'
+import type { I18nKey } from '../i18n/translations'
 import type { BudgetSettings, ReminderSettings } from '../types'
 
 function maskEmail(email?: string | null, fallback = '未绑定邮箱') {
@@ -45,7 +56,7 @@ function maskEmail(email?: string | null, fallback = '未绑定邮箱') {
 
 export default function Profile({ active = true }: { active?: boolean }) {
   const { user, logout } = useAuth()
-  const { settings, updateSettings, t } = useSettings()
+  const { settings, t } = useSettings()
   const navigate = useNavigate()
   const [dayCount, setDayCount] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
@@ -56,8 +67,28 @@ export default function Profile({ active = true }: { active?: boolean }) {
   const [reminder, setReminder] = useState<ReminderSettings>(DEFAULT_REMINDER)
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [budget, setBudget] = useState<BudgetSettings>(DEFAULT_BUDGET)
+  const [badgesOpen, setBadgesOpen] = useState(false)
+  const [equipTick, setEquipTick] = useState(0)
+  const { stats: gamificationStats } = useGamificationStats(active)
 
   const avatar = user?.id ? settings.avatars[user.id] : undefined
+
+  const displayBadgeId = useMemo(() => {
+    if (!user?.id || !gamificationStats) return null
+    return getDisplayBadgeId(user.id, gamificationStats)
+  }, [user?.id, gamificationStats, equipTick])
+  const displayBadge = displayBadgeId ? ACHIEVEMENT_BY_ID[displayBadgeId] : null
+
+  useEffect(() => {
+    if (!user?.id || !gamificationStats) return
+    syncUnlockTimes(user.id, getUnlockedAchievements(gamificationStats))
+  }, [user?.id, gamificationStats])
+
+  useEffect(() => {
+    const bump = () => setEquipTick((n) => n + 1)
+    window.addEventListener(GAMIFICATION_CHANGED_EVENT, bump)
+    return () => window.removeEventListener(GAMIFICATION_CHANGED_EVENT, bump)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -136,29 +167,6 @@ export default function Profile({ active = true }: { active?: boolean }) {
     })
   }
 
-  const uploadAvatar = (file: File) => {
-    if (!user?.id) return false
-    if (!file.type.startsWith('image/')) {
-      message.error('请上传图片')
-      return false
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      message.error('头像请小于 2MB')
-      return false
-    }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = String(reader.result)
-      updateSettings((prev) => ({
-        ...prev,
-        avatars: { ...prev.avatars, [user.id]: dataUrl },
-      }))
-      message.success('头像已更新')
-    }
-    reader.readAsDataURL(file)
-    return false
-  }
-
   return (
     <div className="page profile-page">
       <div className="page-header">
@@ -171,25 +179,33 @@ export default function Profile({ active = true }: { active?: boolean }) {
 
       <Card className="profile-hero" loading={loading}>
         <div className="profile-avatar-wrap">
-          <Upload
-            accept="image/*"
-            showUploadList={false}
-            beforeUpload={uploadAvatar}
-            className="avatar-uploader"
-          >
-            <div className="avatar-hit">
-              <Avatar
-                size={80}
-                src={avatar}
-                style={{ backgroundColor: '#91caff', fontSize: 36 }}
+          <div className="profile-avatar-ring">
+            <Avatar
+              size={80}
+              src={avatar}
+              style={{ backgroundColor: '#91caff', fontSize: 36 }}
+            >
+              👤
+            </Avatar>
+            {displayBadge ? (
+              <span
+                className="profile-avatar-badge"
+                title={t(displayBadge.nameKey as I18nKey)}
+                style={{ '--badge-color': displayBadge.color } as CSSProperties}
               >
-                👤
-              </Avatar>
-              <span className="avatar-edit-badge">📷</span>
+                {displayBadge.icon}
+              </span>
+            ) : null}
+          </div>
+          <div className="profile-identity">
+            <div className="profile-phone">
+              {maskEmail(user?.email, t('noEmail'))}
             </div>
-          </Upload>
-          <div className="profile-phone">
-            {maskEmail(user?.email, t('noEmail'))}
+            {displayBadge ? (
+              <div className="profile-auto-title">
+                {displayBadge.icon} {t(displayBadge.titleKey as I18nKey)}
+              </div>
+            ) : null}
           </div>
         </div>
       </Card>
@@ -215,13 +231,23 @@ export default function Profile({ active = true }: { active?: boolean }) {
       <button
         type="button"
         className="profile-nav-item"
+        onClick={() => setBadgesOpen(true)}
+      >
+        <span>🎖 {t('myBadges')}</span>
+        <span className="profile-nav-extra">
+          {t('myBadgesUnlocked')}
+          <span className="profile-nav-arrow">›</span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="profile-nav-item"
         onClick={() => setReminderOpen(true)}
       >
         <span>⏰ {t('reminder')}</span>
         <span className="profile-nav-extra">
-          {reminder.enabled
-            ? `${t('reminderOn')} ${reminder.remindTime}`
-            : t('reminderOff')}
+          {reminder.enabled ? t('reminderOn') : t('reminderOff')}
           <span className="profile-nav-arrow">›</span>
         </span>
       </button>
@@ -234,7 +260,7 @@ export default function Profile({ active = true }: { active?: boolean }) {
         <span>💰 {t('budget')}</span>
         <span className="profile-nav-extra">
           {budget.enabled && budget.monthAmount > 0
-            ? `${t('budgetOn')} ¥${formatYuan(budget.monthAmount)}`
+            ? t('budgetOn')
             : t('budgetOff')}
           <span className="profile-nav-arrow">›</span>
         </span>
@@ -274,6 +300,11 @@ export default function Profile({ active = true }: { active?: boolean }) {
         open={budgetOpen}
         onClose={() => setBudgetOpen(false)}
         onSaved={setBudget}
+      />
+      <MyBadgesModal
+        open={badgesOpen}
+        onClose={() => setBadgesOpen(false)}
+        stats={gamificationStats}
       />
     </div>
   )

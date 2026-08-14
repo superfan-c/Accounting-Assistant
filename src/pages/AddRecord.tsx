@@ -4,6 +4,7 @@ import RecordForm from '../components/RecordForm'
 import { useSettings } from '../context/SettingsContext'
 import { saveRecord } from '../storage'
 import type { Record } from '../types'
+import { notifyGamificationChanged } from '../gamification/achievements'
 import { notifyBudgetChanged } from '../utils/budget'
 
 export default function AddRecord() {
@@ -18,6 +19,7 @@ export default function AddRecord() {
       note: record.note,
     })
     notifyBudgetChanged()
+    notifyGamificationChanged()
     message.success('记账成功')
   }
 

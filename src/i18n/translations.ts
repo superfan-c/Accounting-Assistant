@@ -1,6 +1,8 @@
+import type { AchievementI18nKey } from './achievementTranslations'
+import { translateAchievement } from './achievementTranslations'
 import type { Lang } from '../settings'
 
-export type I18nKey =
+export type BaseI18nKey =
   | 'appName'
   | 'appSlogan'
   | 'tabAdd'
@@ -93,7 +95,9 @@ export type I18nKey =
   | 'budgetAlertCatWarn'
   | 'budgetAlertCatOver'
 
-const dict: Record<Lang, Record<I18nKey, string>> = {
+export type I18nKey = BaseI18nKey | AchievementI18nKey
+
+const dict: Record<Lang, Record<BaseI18nKey, string>> = {
   zh: {
     appName: '记账助手',
     appSlogan: '有事没事记一笔',
@@ -376,5 +380,7 @@ const dict: Record<Lang, Record<I18nKey, string>> = {
 }
 
 export function translate(lang: Lang, key: I18nKey): string {
-  return dict[lang][key] ?? dict.zh[key] ?? key
+  const base = dict[lang][key as BaseI18nKey]
+  if (base !== undefined) return base
+  return translateAchievement(lang, key as AchievementI18nKey)
 }

@@ -1,6 +1,9 @@
-import { Col, DatePicker, Empty, Row, Statistic } from 'antd'
+import { Col, DatePicker, Empty, Row, Spin, Statistic } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import BadgeGrid from '../components/BadgeGrid'
+import StreakHeatmap from '../components/StreakHeatmap'
+import { useGamificationStats } from '../gamification/useGamificationStats'
 import {
   CartesianGrid,
   Cell,
@@ -105,6 +108,7 @@ function PieBlock({
 
 export default function Statistics({ active = true }: { active?: boolean }) {
   const { t } = useSettings()
+  const { stats, loading: streakLoading } = useGamificationStats(active)
   const [month, setMonth] = useState<Dayjs>(dayjs())
   const [records, setRecords] = useState<Record[]>([])
   const [allRecent, setAllRecent] = useState<Record[]>([])
@@ -189,6 +193,28 @@ export default function Statistics({ active = true }: { active?: boolean }) {
         <span className="title-icon">📊</span>
         {t('statistics')}
       </h2>
+
+      {streakLoading && !stats ? (
+        <div className="streak-loading">
+          <Spin />
+        </div>
+      ) : stats ? (
+        <div className="chart-block streak-gamification-block">
+          <Row gutter={8} className="streak-summary-row">
+            <Col span={8}>
+              <Statistic title={t('streakCurrent')} value={stats.currentStreak} />
+            </Col>
+            <Col span={8}>
+              <Statistic title={t('streakLongest')} value={stats.longestStreak} />
+            </Col>
+            <Col span={8}>
+              <Statistic title={t('streakTotalDays')} value={stats.totalDays} />
+            </Col>
+          </Row>
+          <StreakHeatmap weeks={stats.heatmapWeeks} />
+          <BadgeGrid stats={stats} />
+        </div>
+      ) : null}
 
       <DatePicker
         picker="month"

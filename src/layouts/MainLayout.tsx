@@ -7,6 +7,7 @@ import {
 } from 'antd-mobile-icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AppLogo from '../components/AppLogo'
+import AchievementUnlockModal from '../components/AchievementUnlockModal'
 import BudgetAlertModal from '../components/BudgetAlertModal'
 import { useSettings } from '../context/SettingsContext'
 import AddRecord from '../pages/AddRecord'
@@ -66,6 +67,7 @@ export default function MainLayout() {
         </div>
       </div>
       <BudgetAlertModal />
+      <AchievementUnlockModal />
       <div className="tab-bar-wrap">
         <TabBar activeKey={active} onChange={(key) => navigate(key)}>
           {tabs.map((item) => (
